@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Jun 20 13:34:16 2020
-
-@author: benceszabo
-"""
-
 import plotly.express as px
 import pandas as pd
 from geopy.geocoders import Nominatim
@@ -21,58 +13,95 @@ token = os.environ["USELESS_WEATHER_PASTCAST_TOKEN"]
 
 dbx = dx.Dropbox(token)
 
-cities_df = pickle.loads(dbx.files_download("/cities.pkl")[1].content)
+cities = pickle.loads(dbx.files_download("/cities.pkl")[1].content)
 
-app = dash.Dash(__name__)
 external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
+dat = pd.concat([cdf.assign(city=k) for k, cdf in cities.items()], axis=0)
 
-dat=pd.concat(cities_df,axis=0).reset_index().rename(columns={"level_0": "city"}).drop("level_1",axis=1)
 
-cols=dat.columns.drop(['Years','Months','city'])
+cols = dat.columns.drop(["Years", "Months", "city"])
 
-dat[cols]=dat[cols].apply(pd.to_numeric,errors="coerce")
+dat[cols] = dat[cols].apply(pd.to_numeric, errors="coerce")
 
-fin=dat.groupby("city").agg("mean").reset_index()
-fin
+fin = dat.groupby("city").agg("mean").reset_index()
 
-geolocator=Nominatim(user_agent="test")
+geolocator = Nominatim(user_agent="test")
 
-fin["loc"]=fin.city.apply(lambda x: geolocator.geocode(x+",Hungary").raw)
+fin["loc"] = fin.city.apply(lambda x: geolocator.geocode(x + ",Hungary").raw)
+fin["lat"] = fin["loc"].apply(lambda x: float(x["lat"]))
+fin["lon"] = fin["loc"].apply(lambda x: float(x["lon"]))
 
-fin
-
-fin['lat']=fin['loc'].apply(lambda x: float(x['lat']))
-fin['lon']=fin['loc'].apply(lambda x: float(x['lon']))
-
-fig = px.scatter_mapbox(fin, lat="lat", lon="lon", hover_name="city", hover_data=["Average temperature", "Rain quantity"],
-                        color_discrete_sequence=["fuchsia"], zoom=5, height=300)
+fig = px.scatter_mapbox(
+    fin,
+    lat="lat",
+    lon="lon",
+    hover_name="city",
+    hover_data=["Average temperature", "Rain quantity"],
+    color_discrete_sequence=["fuchsia"],
+    zoom=5,
+    height=300,
+)
 fig.update_layout(mapbox_style="open-street-map")
-fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-#fig.show()
+fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
+# fig.show()
 
 
 # app layout
-layout = go.Layout( height = 1000,
-                   xaxis_showgrid=False,
-                   yaxis_showgrid=False,
-                   yaxis_autorange='reversed')
-
+layout = go.Layout(
+    height=1000, xaxis_showgrid=False, yaxis_showgrid=False, yaxis_autorange="reversed"
+)
 
 app.layout = html.Div(
-    children=[
-        html.H1(children=f"Useless weather pastcast"),
-        
-        dcc.Graph( id='example-graph', 
-                  figure = fig)
-        
+    [
+        html.H1(children=f"Useless & ugly weather pastcast"),
+        html.Div(
+            [
+                html.Div(
+                    dcc.Graph(id="map-graph", figure=fig), className="six columns"
+                ),
+                html.Div(
+                        # dcc.Dropdown(
+                        #    id="varosok",
+                        #    options=[{"label": e, "value": e} for e in cities.keys()],
+                        #    value="Budapest",
+                        # ),
+                        html.Div(children=dcc.Graph(id="diagram"),),
+                    className="six columns",
+                ),
+            ]
+        ),
+    html.Div(children = "A fent található ábra a KSH 12 időjárás megfigyelő állomásán detektált adatokat mutatja be. "
+                        "Részletesebb és jövőbetekintő adatokért keresd az időképet: "),
     ]
 )
 
-server= app.server
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+@app.callback(
+    dash.dependencies.Output("diagram", "figure"),
+    [  # dash.dependencies.Input("varosok", "value"),
+        dash.dependencies.Input("map-graph", "hoverData")
+    ],
+)
+def update_output(hover_value):
+    if hover_value is None:
+        value = "Budapest"
+    else:
+        try:
+            value = hover_value["points"][0]["hovertext"]
+        except (KeyError, IndexError):
+            value = "Budapest"
+    return px.scatter(
+        cities[value],
+        x="Years",
+        y="Average temperature",
+        # color="team",
+        hover_data=["Months"],
+    )
 
 
+server = app.server
+
+if __name__ == "__main__":
+    app.run_server(port=6972, debug=True)
