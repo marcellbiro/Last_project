@@ -1,7 +1,9 @@
 name: "Scraping and parsing weather data from ksh.hu"
 
-on:
-
+on: 
+  push:
+    branches:
+      - master
   schedule:
     - cron:  '0 0 1 * *'
 
