@@ -1,6 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import dropbox
+import pickle
+import pandas as pd
+import os
 
 URL = 'http://www.ksh.hu/docs/hun/xstadat/xstadat_evkozi/e_met001.html'
 page = requests.get(URL)
@@ -77,6 +81,9 @@ avg_tmp.pop(-1)
 max_tmp.pop(-1)
 min_tmp.pop(-1)
 rainy_days.pop(-1)
+rain_qty.pop(-1)
+sunny_hours.pop(-1)
+windy_days.pop(-1)
 
 
 budapest["Years"] = years
@@ -167,6 +174,9 @@ avg_tmp.pop(-1)
 max_tmp.pop(-1)
 min_tmp.pop(-1)
 rainy_days.pop(-1)
+rain_qty.pop(-1)
+sunny_hours.pop(-1)
+windy_days.pop(-1)
 
 debrecen["Years"] = years
 debrecen["Months"] = months
@@ -256,6 +266,9 @@ avg_tmp.pop(-1)
 max_tmp.pop(-1)
 min_tmp.pop(-1)
 rainy_days.pop(-1)
+rain_qty.pop(-1)
+sunny_hours.pop(-1)
+windy_days.pop(-1)
 
 
 gyor["Years"] = years
@@ -274,3 +287,13 @@ cities = {
     "Debrecen": debrecen,
     "Budapest": budapest
 }
+
+token = os.environ["USELESS_WEATHER_PASTCAST_KEY"]
+
+dbx = dropbox.Dropbox(token)
+
+with open('cities.pkl', 'wb') as f:
+    pickle.dump(cities, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open("cities.pkl", "rb") as fp:
+    dbx.files_upload(fp.read(), "/cities.pkl", mode = dropbox.files.WriteMode("overwrite"))
